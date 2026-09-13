@@ -3,7 +3,13 @@
   "name": "BFBC Song Database",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3844/3844724.png",
+      "src": "icon.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon.jpg",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
