@@ -408,18 +408,23 @@ songForm.addEventListener('submit', async (e) => {
             audio_url,
             video_url,
             lyrics,
-            approved: false, // Explicit boolean false for New Song Folder
+            approved: false,
             created_at: Date.now()
         };
 
         if (db) {
             try {
-                const { data, error } = await db.from('songs_sandbox').insert([newSong]).select();
-                if (!error) {
+                const { error } = await db.from('songs_sandbox').insert([newSong]);
+                if (error) {
+                    alert('Save Failed: ' + error.message);
+                    return;
+                } else {
+                    alert('Success! Song saved to Sandbox.');
                     await fetchSongs();
                 }
             } catch (err) {
-                console.error('Supabase insert error:', err);
+                alert('Connection Error: ' + err.message);
+                return;
             }
         } else {
             songs.push({ id: Date.now().toString(), ...newSong });
@@ -433,10 +438,17 @@ songForm.addEventListener('submit', async (e) => {
     } else {
         if (db) {
             try {
-                await db.from('songs_sandbox').update({ title, category, audio_url, video_url, lyrics }).eq('id', id);
-                await fetchSongs();
+                const { error } = await db.from('songs_sandbox').update({ title, category, audio_url, video_url, lyrics }).eq('id', id);
+                if (error) {
+                    alert('Update Failed: ' + error.message);
+                    return;
+                } else {
+                    alert('Success! Song updated.');
+                    await fetchSongs();
+                }
             } catch (err) {
-                console.error('Supabase update error:', err);
+                alert('Update Error: ' + err.message);
+                return;
             }
         } else {
             songs = songs.map(s => s.id == id ? { ...s, title, category, audio_url, video_url, lyrics } : s);
