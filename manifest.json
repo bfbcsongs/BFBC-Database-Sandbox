@@ -1,0 +1,17 @@
+{
+  "short_name": "BFBC Songs",
+  "name": "BFBC Song Database",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3844/3844724.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "display": "standalone",
+  "orientation": "portrait"
+}
