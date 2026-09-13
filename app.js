@@ -451,14 +451,15 @@ function openSongDetails(song) {
             
             <div class="flex items-center gap-2 pt-1 flex-wrap">
                 ${song.audio_url ? `<a href="${song.audio_url}" target="_blank" class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"><i class="fa-solid fa-play"></i> Play Audio</a>` : ''}
-                <button onclick="handleEditFromModal('${song.id}')" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
-    <i class="fa-solid fa-pen"></i> Edit
-</button>
-
-<button onclick="handleApprovalFromModal('${song.id}')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer">
-    <i class="fa-solid fa-thumbs-up"></i> ${song.is_approved === false ? 'Approve' : 'Approved'}
-</button>
-</div>
+                
+                <button id="modal-edit-btn" class="bg-slate-700 active:bg-slate-500 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer select-none">
+                    <i class="fa-solid fa-pen"></i> Edit <span id="edit-tap-count" class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">0/5</span>
+                </button>
+                
+                <button id="modal-approve-btn" class="bg-amber-500/20 active:bg-amber-500/40 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer select-none">
+                    <i class="fa-solid fa-thumbs-up"></i> ${song.is_approved === false ? 'Approve' : 'Approved'} <span id="approve-tap-count" class="text-[10px] bg-amber-950/60 px-1.5 py-0.5 rounded text-amber-400">0/5</span>
+                </button>
+            </div>
 
             ${videoEmbed}
 
@@ -472,51 +473,35 @@ function openSongDetails(song) {
     `;
 
     detailsModal.classList.remove('hidden');
-}
-// Function para isara ang Details Modal
-function closeDetailsModal() {
-    const detailsModal = document.getElementById('details-modal');
-    if (detailsModal) {
-        detailsModal.classList.add('hidden');
-    }
-}
 
-// Global click listener para sa Exit (X) button at backdrop
-document.addEventListener('DOMContentLoaded', () => {
-    const closeBtn = document.getElementById('close-details-btn');
-    const detailsModal = document.getElementById('details-modal');
+    // 5-Tap logic para sa Edit
+    let editTapCount = 0;
+    document.getElementById('modal-edit-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editTapCount++;
+        const badge = document.getElementById('edit-tap-count');
+        if (badge) badge.textContent = `${editTapCount}/5`;
 
-    if (closeBtn) {
-        closeBtn.addEventListener('click', closeDetailsModal);
-    }
+        if (editTapCount >= 5) {
+            closeDetailsModal();
+            if (typeof editSong === 'function') editSong(song.id);
+        }
+    });
 
-    if (detailsModal) {
-        detailsModal.addEventListener('click', (e) => {
-            if (e.target === detailsModal) {
-                closeDetailsModal();
-            }
-        });
-    }
-});
+    // 5-Tap logic para sa Approve
+    let approveTapCount = 0;
+    document.getElementById('modal-approve-btn')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        approveTapCount++;
+        const badge = document.getElementById('approve-tap-count');
+        if (badge) badge.textContent = `${approveTapCount}/5`;
 
-// Upgraded Edit Song Action (Closes modal first, then opens edit form)
-window.handleEditFromModal = function(songId) {
-    closeDetailsModal();
-    if (typeof editSong === 'function') {
-        editSong(songId);
-    }
-};
-
-// Upgraded Toggle Approval Action (Updates DB and updates modal view)
-window.handleApprovalFromModal = async function(songId) {
-    if (typeof toggleApproval === 'function') {
-        await toggleApproval(songId);
-        // Hanapin ulit ang na-update na song para i-refresh ang modal
-        if (typeof songs !== 'undefined') {
-            const updatedSong = songs.find(s => s.id == songId);
-            if (updatedSong && typeof openSongDetails === 'function') {
-                openSongDetails(updatedSong);
+        if (approveTapCount >= 5) {
+            if (typeof toggleApproval === 'function') {
+                await toggleApproval(song.id);
+                const updatedSong = (typeof songs !== 'undefined') ? songs.find(s => s.id == song.id) : null;
+                if (updatedSong) openSongDetails(updatedSong);
             }
         }
-    }
-};
+    });
+}
