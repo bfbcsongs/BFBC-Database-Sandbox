@@ -451,9 +451,14 @@ function openSongDetails(song) {
             
             <div class="flex items-center gap-2 pt-1 flex-wrap">
                 ${song.audio_url ? `<a href="${song.audio_url}" target="_blank" class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"><i class="fa-solid fa-play"></i> Play Audio</a>` : ''}
-                <button onclick="editSong('${song.id}')" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer"><i class="fa-solid fa-pen"></i> Edit</button>
-                <button onclick="toggleApproval('${song.id}')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"><i class="fa-solid fa-thumbs-up"></i> ${song.is_approved === false ? 'Approve' : 'Approved'}</button>
-            </div>
+                <button onclick="handleEditFromModal('${song.id}')" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+    <i class="fa-solid fa-pen"></i> Edit
+</button>
+
+<button onclick="handleApprovalFromModal('${song.id}')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer">
+    <i class="fa-solid fa-thumbs-up"></i> ${song.is_approved === false ? 'Approve' : 'Approved'}
+</button>
+</div>
 
             ${videoEmbed}
 
@@ -468,3 +473,50 @@ function openSongDetails(song) {
 
     detailsModal.classList.remove('hidden');
 }
+// Function para isara ang Details Modal
+function closeDetailsModal() {
+    const detailsModal = document.getElementById('details-modal');
+    if (detailsModal) {
+        detailsModal.classList.add('hidden');
+    }
+}
+
+// Global click listener para sa Exit (X) button at backdrop
+document.addEventListener('DOMContentLoaded', () => {
+    const closeBtn = document.getElementById('close-details-btn');
+    const detailsModal = document.getElementById('details-modal');
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeDetailsModal);
+    }
+
+    if (detailsModal) {
+        detailsModal.addEventListener('click', (e) => {
+            if (e.target === detailsModal) {
+                closeDetailsModal();
+            }
+        });
+    }
+});
+
+// Upgraded Edit Song Action (Closes modal first, then opens edit form)
+window.handleEditFromModal = function(songId) {
+    closeDetailsModal();
+    if (typeof editSong === 'function') {
+        editSong(songId);
+    }
+};
+
+// Upgraded Toggle Approval Action (Updates DB and updates modal view)
+window.handleApprovalFromModal = async function(songId) {
+    if (typeof toggleApproval === 'function') {
+        await toggleApproval(songId);
+        // Hanapin ulit ang na-update na song para i-refresh ang modal
+        if (typeof songs !== 'undefined') {
+            const updatedSong = songs.find(s => s.id == songId);
+            if (updatedSong && typeof openSongDetails === 'function') {
+                openSongDetails(updatedSong);
+            }
+        }
+    }
+};
