@@ -51,13 +51,26 @@ const cancelModalBtn = document.getElementById('cancel-modal-btn');
 // YOUTUBE HELPER FUNCTIONS
 // ==========================================
 function extractYouTubeID(url) {
-    if (!url || url === '#') return null;
+    if (!url || url === '#' || typeof url !== 'string') return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
 }
 
+// Scoped Audio Player Loader (Fixes multi-tap diversion issue)
 window.loadYTPlayer = function(songId, videoId) {
+    // Stop any previously playing dynamic players safely
+    const allPlayers = document.querySelectorAll('[id^="yt-player-"]');
+    allPlayers.forEach(p => {
+        if (p.id !== `yt-player-${songId}`) {
+            p.classList.add('hidden');
+            p.innerHTML = '';
+        }
+    });
+
+    const allPreviews = document.querySelectorAll('[id^="yt-preview-"]');
+    allPreviews.forEach(pv => pv.classList.remove('hidden'));
+
     const previewContainer = document.getElementById(`yt-preview-${songId}`);
     const playerContainer = document.getElementById(`yt-player-${songId}`);
 
@@ -79,6 +92,11 @@ window.loadYTPlayer = function(songId, videoId) {
     }
 };
 
+// Helper for strict unapproved status check
+function isUnapproved(song) {
+    return song.approved === false || song.approved === 'false' || song.approved === 0 || song.approved === '0';
+}
+
 // ==========================================
 // SUPABASE INITIALIZATION & FETCH
 // ==========================================
@@ -95,7 +113,6 @@ function initSupabase() {
 async function fetchSongs() {
     if (!db) return;
     try {
-        // Connected to dedicated sandbox table: songs_sandbox
         const { data, error } = await db.from('songs_sandbox').select('*').order('created_at', { ascending: false });
         if (!error && data && data.length > 0) {
             songs = data;
@@ -107,14 +124,14 @@ async function fetchSongs() {
 }
 
 function updateNewFolderBadge() {
-    const unapprovedCount = songs.filter(s => s.approved === false || s.approved === 'false').length;
+    const unapprovedCount = songs.filter(s => isUnapproved(s)).length;
     if (newCountBadge) {
         newCountBadge.textContent = unapprovedCount;
     }
 }
 
 // ==========================================
-// RENDER SONGS WITH EMBEDDED THUMBNAIL & PLAYER
+// RENDER SONGS
 // ==========================================
 function renderSongs(songsToRender, titleText) {
     listHeader.textContent = titleText;
@@ -135,9 +152,9 @@ function renderSongs(songsToRender, titleText) {
     }
 
     songsList.innerHTML = sortedSongs.map(song => {
-        // Extract Video ID from video_url or audio_url
         const ytId = extractYouTubeID(song.video_url) || extractYouTubeID(song.audio_url);
         const thumbnailUrl = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null;
+        const songIsUnapproved = isUnapproved(song);
 
         return `
         <div class="p-4 bg-slate-800 border border-slate-700/70 rounded-xl hover:border-indigo-500/50 transition-all space-y-3">
@@ -148,7 +165,7 @@ function renderSongs(songsToRender, titleText) {
                         <span class="text-xs px-2.5 py-0.5 bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 rounded-full font-medium">
                             ${song.category}
                         </span>
-                        ${(song.approved === false || song.approved === 'false') ? `<span class="text-[10px] px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full font-bold">Unapproved</span>` : ''}
+                        ${songIsUnapproved ? `<span class="text-[10px] px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full font-bold">Unapproved</span>` : ''}
                     </div>
                 </div>
 
@@ -172,7 +189,6 @@ function renderSongs(songsToRender, titleText) {
                 </div>
             </div>
 
-            <!-- YouTube Thumbnail Preview & Embedded Player Card -->
             ${ytId ? `
             <div class="mt-2 rounded-lg overflow-hidden border border-slate-700 bg-slate-900">
                 <div id="yt-preview-${song.id}" class="relative cursor-pointer group" onclick="loadYTPlayer('${song.id}', '${ytId}')">
@@ -187,7 +203,6 @@ function renderSongs(songsToRender, titleText) {
             </div>
             ` : ''}
 
-            <!-- Lyrics Container -->
             <div id="lyrics-container-${song.id}" class="hidden pt-3 border-t border-slate-700/60 text-slate-300 text-sm whitespace-pre-line font-mono bg-slate-900/50 p-3 rounded-lg border border-slate-800">
                 ${song.lyrics || 'No lyrics provided.'}
             </div>
@@ -272,21 +287,18 @@ function filterAndShowSongs() {
 
     if (inNewFolderView) {
         filtered = songs.filter(song => {
-            const isUnapproved = (song.approved === false || song.approved === 'false');
             const matchesSearch = song.title.toLowerCase().includes(query) || (song.lyrics && song.lyrics.toLowerCase().includes(query));
-            return isUnapproved && matchesSearch;
+            return isUnapproved(song) && matchesSearch;
         });
         renderSongs(filtered, query ? `New Folder matching "${query}"` : "New Songs Folder");
     } else {
         filtered = songs.filter(song => {
-            const isApproved = song.approved !== false && song.approved !== 'false';
             const matchesSearch = song.title.toLowerCase().includes(query) || (song.lyrics && song.lyrics.toLowerCase().includes(query));
-            
             const matchesCategory = activeCategory 
                 ? (song.category && song.category.trim().toLowerCase() === activeCategory.trim().toLowerCase())
                 : true;
 
-            return isApproved && matchesSearch && matchesCategory;
+            return !isUnapproved(song) && matchesSearch && matchesCategory;
         });
 
         const headerLabel = activeCategory 
@@ -396,14 +408,16 @@ songForm.addEventListener('submit', async (e) => {
             audio_url,
             video_url,
             lyrics,
-            approved: false,
+            approved: false, // Explicit boolean false for New Song Folder
             created_at: Date.now()
         };
 
         if (db) {
             try {
-                await db.from('songs_sandbox').insert([newSong]);
-                await fetchSongs();
+                const { data, error } = await db.from('songs_sandbox').insert([newSong]).select();
+                if (!error) {
+                    await fetchSongs();
+                }
             } catch (err) {
                 console.error('Supabase insert error:', err);
             }
