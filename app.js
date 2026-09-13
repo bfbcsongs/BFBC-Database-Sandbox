@@ -333,135 +333,107 @@ searchInput.addEventListener('click', () => {
     newFolderBtn.classList.add('bg-amber-500/20', 'text-amber-300');
     clearCategorySelection();
     filterAndShowSongs();
-});
+function renderSongs(songsToRender, titleText = "All Songs") {
+    const listHeader = document.getElementById('list-header');
+    const songsList = document.getElementById('songs-list');
+    const songCount = document.getElementById('song-count');
 
-searchInput.addEventListener('input', () => {
-    filterAndShowSongs();
-});
+    if (listHeader) listHeader.textContent = titleText;
+    if (songCount) songCount.textContent = `${songsToRender.length} song${songsToRender.length !== 1 ? 's' : ''} found`;
+    if (!songsList) return;
 
-categoryButtons.forEach(button => {
-    button.addEventListener('click', () => {
-        inNewFolderView = false;
-        newFolderBtn.classList.remove('bg-amber-500', 'text-slate-900');
-        newFolderBtn.classList.add('bg-amber-500/20', 'text-amber-300');
-
-        const category = button.getAttribute('data-category');
-
-        if (activeCategory === category) {
-            clearCategorySelection();
-        } else {
-            clearCategorySelection();
-            activeCategory = category;
-            button.classList.remove('bg-slate-800', 'text-slate-300');
-            button.classList.add('bg-indigo-600', 'text-white');
-        }
-
-        filterAndShowSongs();
-    });
-});
-
-function openModal(isEdit = false) {
-    modalTitle.textContent = isEdit ? "Edit Song" : "Add New Song";
-    songModal.classList.remove('hidden');
-}
-
-function closeModal() {
-    songModal.classList.add('hidden');
-    songForm.reset();
-    document.getElementById('song-id').value = '';
-}
-
-addSongBtn.addEventListener('click', () => openModal(false));
-closeModalBtn.addEventListener('click', closeModal);
-cancelModalBtn.addEventListener('click', closeModal);
-
-function editSong(id) {
-    const song = songs.find(s => s.id == id);
-    if (!song) return;
-
-    document.getElementById('song-id').value = song.id;
-    document.getElementById('song-title-input').value = song.title;
-    document.getElementById('song-category-input').value = song.category;
-    document.getElementById('song-audio-input').value = song.audio_url !== '#' ? (song.audio_url || '') : '';
-    document.getElementById('song-video-input').value = song.video_url !== '#' ? (song.video_url || '') : '';
-    document.getElementById('song-lyrics-input').value = song.lyrics || '';
-
-    openModal(true);
-}
-
-songForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const id = document.getElementById('song-id').value;
-    const isNew = !id;
-
-    const title = document.getElementById('song-title-input').value;
-    const category = document.getElementById('song-category-input').value;
-    const audio_url = document.getElementById('song-audio-input').value || '';
-    const video_url = document.getElementById('song-video-input').value || '';
-    const lyrics = document.getElementById('song-lyrics-input').value || '';
-
-    if (isNew) {
-        const newSong = {
-            title,
-            category,
-            audio_url,
-            video_url,
-            lyrics,
-            approved: false,
-            created_at: Date.now()
-        };
-
-        if (db) {
-            try {
-                const { error } = await db.from('songs_sandbox').insert([newSong]);
-                if (error) {
-                    alert('Save Failed: ' + error.message);
-                    return;
-                } else {
-                    alert('Success! Song saved to Sandbox.');
-                    await fetchSongs();
-                }
-            } catch (err) {
-                alert('Connection Error: ' + err.message);
-                return;
-            }
-        } else {
-            songs.push({ id: Date.now().toString(), ...newSong });
-        }
-
-        inNewFolderView = true;
-        newFolderBtn.classList.remove('bg-amber-500/20', 'text-amber-300');
-        newFolderBtn.classList.add('bg-amber-500', 'text-slate-900');
-        clearCategorySelection();
-
+    let sortedSongs = [...songsToRender];
+    if (window.inNewFolderView) {
+        sortedSongs.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
     } else {
-        if (db) {
-            try {
-                const { error } = await db.from('songs_sandbox').update({ title, category, audio_url, video_url, lyrics }).eq('id', id);
-                if (error) {
-                    alert('Update Failed: ' + error.message);
-                    return;
-                } else {
-                    alert('Success! Song updated.');
-                    await fetchSongs();
-                }
-            } catch (err) {
-                alert('Update Error: ' + err.message);
-                return;
-            }
-        } else {
-            songs = songs.map(s => s.id == id ? { ...s, title, category, audio_url, video_url, lyrics } : s);
-        }
+        sortedSongs.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
     }
 
-    updateNewFolderBadge();
-    closeModal();
-    filterAndShowSongs();
-});
+    songsList.innerHTML = '';
 
-window.addEventListener('DOMContentLoaded', async () => {
-    initSupabase();
-    await fetchSongs();
-    filterAndShowSongs();
+    if (sortedSongs.length === 0) {
+        songsList.innerHTML = `<div class="text-center py-8 text-slate-500 text-sm">No songs found</div>`;
+        return;
+    }
+
+    sortedSongs.forEach(song => {
+        const item = document.createElement('div');
+        item.className = 'bg-slate-800 border border-slate-700/80 hover:border-indigo-500/50 rounded-xl p-3.5 flex items-center justify-between cursor-pointer transition shadow-sm hover:bg-slate-700/50 mb-2';
+        
+        item.innerHTML = `
+            <div class="flex items-center space-x-3 overflow-hidden">
+                <div class="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">
+                    <i class="fa-solid fa-music"></i>
+                </div>
+                <div class="truncate">
+                    <h3 class="font-bold text-sm text-slate-100 truncate">${song.title}</h3>
+                    <span class="inline-block text-[10px] font-semibold text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full mt-0.5">${song.category || 'Others'}</span>
+                </div>
+            </div>
+            <i class="fa-solid fa-chevron-right text-slate-500 text-xs pl-2"></i>
+        `;
+
+        item.addEventListener('click', () => openSongDetails(song));
+        songsList.appendChild(item);
+    });
+}
+
+function openSongDetails(song) {
+    const modal = document.getElementById('details-modal');
+    const content = document.getElementById('details-modal-content');
+
+    if (!modal || !content) return;
+
+    let videoEmbed = '';
+    if (song.video_url) {
+        let embedUrl = song.video_url;
+        if (embedUrl.includes('watch?v=')) {
+            embedUrl = embedUrl.replace('watch?v=', 'embed/');
+        } else if (embedUrl.includes('youtu.be/')) {
+            embedUrl = embedUrl.replace('youtu.be/', 'youtube.com/embed/');
+        }
+        videoEmbed = `<iframe class="w-full aspect-video rounded-xl mt-3 border border-slate-700" src="${embedUrl}" allowfullscreen></iframe>`;
+    }
+
+    content.innerHTML = `
+        <div class="space-y-3">
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">${song.category || 'Others'}</span>
+            <h2 class="text-xl font-extrabold text-white leading-tight pt-1">${song.title}</h2>
+            
+            <div class="flex items-center gap-2 pt-1 flex-wrap">
+                ${song.audio_url ? `<a href="${song.audio_url}" target="_blank" class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"><i class="fa-solid fa-play"></i> Play Audio</a>` : ''}
+                <button onclick="editSong('${song.id}')" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"><i class="fa-solid fa-pen"></i> Edit</button>
+                <button onclick="toggleApproval('${song.id}')" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"><i class="fa-solid fa-thumbs-up"></i></button>
+            </div>
+
+            ${videoEmbed}
+
+            ${song.lyrics ? `
+                <div class="pt-2">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Lyrics</h4>
+                    <div class="bg-slate-900 border border-slate-700/60 p-3 rounded-xl text-xs font-mono whitespace-pre-line text-slate-200 leading-relaxed max-h-60 overflow-y-auto">${song.lyrics}</div>
+                </div>
+            ` : ''}
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+}
+
+// Global listener para sa pag-close ng details modal
+document.addEventListener('DOMContentLoaded', () => {
+    const closeBtn = document.getElementById('close-details-btn');
+    const modal = document.getElementById('details-modal');
+    
+    if (closeBtn && modal) {
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    }
 });
