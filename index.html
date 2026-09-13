@@ -140,17 +140,16 @@
         </div>
     </div>
 
-    <!-- Application Logic -->
     <script src="app.js"></script>
-    <!-- Service Worker Registration -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('SW registered!', reg))
-            .catch(err => console.error('SW registration failed!', err));
-        });
-      }
-    </script>
+<!-- Service Worker Registration -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js?v=2', { scope: './' })
+        .then(reg => console.log('SW registered!', reg))
+        .catch(err => console.error('SW registration failed!', err));
+    });
+  }
+</script>
 </body>
 </html>
