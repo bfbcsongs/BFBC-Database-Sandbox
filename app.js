@@ -427,3 +427,58 @@ songForm.addEventListener('submit', async (e) => {
 window.addEventListener('DOMContentLoaded', () => {
     listenToSongs();
 });
+// ==========================================
+// PWA INSTALLATION PROMPT LOGIC
+// ==========================================
+let deferredPrompt;
+const installBanner = document.getElementById('pwa-install-banner');
+const installBtn = document.getElementById('pwa-install-btn');
+const exploreBtn = document.getElementById('pwa-explore-btn');
+
+// Abangan ang install event mula sa browser
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Pigilan ang awtomatikong lumabas ang maliit na banner ng browser
+    e.preventDefault();
+    deferredPrompt = e;
+
+    // Ipakita ang ating custom Install / Explore banner
+    if (installBanner) {
+        installBanner.classList.remove('hidden');
+    }
+});
+
+// Kapag pinitik ang "Install App Now"
+if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        
+        // Itago ang banner
+        installBanner.classList.add('hidden');
+        
+        // Ipakita ang native installation dialog ng phone
+        deferredPrompt.prompt();
+        
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`User response to install prompt: ${outcome}`);
+        
+        deferredPrompt = null;
+    });
+}
+
+// Kapag pinitik ang "Explore First"
+if (exploreBtn) {
+    exploreBtn.addEventListener('click', () => {
+        if (installBanner) {
+            installBanner.classList.add('hidden');
+        }
+    });
+}
+
+// Tiyaking nakatago kapag nakakabit na bilang totoong app
+window.addEventListener('appinstalled', () => {
+    if (installBanner) {
+        installBanner.classList.add('hidden');
+    }
+    deferredPrompt = null;
+    console.log('PWA successfully installed!');
+});
