@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bfbc-songs-v1';
+const CACHE_NAME = 'bfbc-songs-v2';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -33,7 +33,12 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network-First strategy para updated lagi ang Supabase data
+  // Pass non-GET requests and external API calls directly through without caching
+  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
+  // Network-First strategy for local app shell assets
   event.respondWith(
     fetch(event.request)
       .then((response) => {
