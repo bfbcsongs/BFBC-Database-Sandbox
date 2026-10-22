@@ -1,11 +1,20 @@
-const SUPABASE_URL = 'https://qxnrogteskdwvrxztwvx.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_nFGA38fcKrTioIZOkAHRrg_MkbZigvw';
+// Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDw2xu8kH7569J8tpz2dW_kGLXXsX468gc",
+  authDomain: "bfbc-songs.firebaseapp.com",
+  projectId: "bfbc-songs",
+  storageBucket: "bfbc-songs.appspot.com",
+  messagingSenderId: "66479523449",
+  appId: "1:66479523449:web:cae996c183a255656f7328"
+};
 
-let db = null;
+// Initialize Firebase & Firestore
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore();
 
-// Initial Fallback Songs Dataset
 let songs = [];
-
 let activeCategory = null;
 let inNewFolderView = false;
 
@@ -76,31 +85,19 @@ function isUnapproved(song) {
 }
 
 // ==========================================
-// SUPABASE INITIALIZATION & FETCH
+// FIRESTORE REAL-TIME LISTENER
 // ==========================================
-function initSupabase() {
-    if (typeof supabase !== 'undefined') {
-        try {
-            db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        } catch(e) {
-            console.error('Supabase initialization failed:', e);
-        }
-    }
-}
-
-async function fetchSongs() {
-    if (!db) return;
-    try {
-        const { data, error } = await db.from('songs').select('*').order('created_at', { ascending: false });
-        if (error) {
-            console.error('Fetch error from Supabase:', error.message);
-        } else if (data) {
-            songs = data;
-        }
-    } catch (err) {
-        console.error('Failed to fetch songs:', err);
-    }
-    updateNewFolderBadge();
+function listenToSongs() {
+    db.collection('songs').orderBy('created_at', 'desc').onSnapshot(snapshot => {
+        songs = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        updateNewFolderBadge();
+        filterAndShowSongs();
+    }, error => {
+        console.error("Firestore Listen Error:", error);
+    });
 }
 
 function updateNewFolderBadge() {
@@ -260,18 +257,12 @@ window.handleThumbsUpTap = async function(id) {
 };
 
 async function approveSong(id) {
-    if (db) {
-        try {
-            await db.from('songs').update({ approved: true }).eq('id', id);
-            await fetchSongs();
-        } catch (err) {
-            console.error('Approval error:', err);
-        }
-    } else {
-        songs = songs.map(s => s.id == id ? { ...s, approved: true } : s);
+    try {
+        await db.collection('songs').doc(id).update({ approved: true });
+        alert('Success! Song approved.');
+    } catch (err) {
+        alert('Approval Error: ' + err.message);
     }
-    updateNewFolderBadge();
-    filterAndShowSongs();
 }
 
 function filterAndShowSongs() {
@@ -407,22 +398,12 @@ songForm.addEventListener('submit', async (e) => {
             created_at: Date.now()
         };
 
-        if (db) {
-            try {
-                const { error } = await db.from('songs').insert([newSong]);
-                if (error) {
-                    alert('Save Failed: ' + error.message);
-                    return;
-                } else {
-                    alert('Success! Song saved.');
-                    await fetchSongs();
-                }
-            } catch (err) {
-                alert('Connection Error: ' + err.message);
-                return;
-            }
-        } else {
-            songs.push({ id: Date.now().toString(), ...newSong });
+        try {
+            await db.collection('songs').add(newSong);
+            alert('Success! Song saved to Firebase.');
+        } catch (err) {
+            alert('Save Failed: ' + err.message);
+            return;
         }
 
         inNewFolderView = true;
@@ -431,32 +412,18 @@ songForm.addEventListener('submit', async (e) => {
         clearCategorySelection();
 
     } else {
-        if (db) {
-            try {
-                const { error } = await db.from('songs').update({ title, category, audio_url, video_url, lyrics }).eq('id', id);
-                if (error) {
-                    alert('Update Failed: ' + error.message);
-                    return;
-                } else {
-                    alert('Success! Song updated.');
-                    await fetchSongs();
-                }
-            } catch (err) {
-                alert('Update Error: ' + err.message);
-                return;
-            }
-        } else {
-            songs = songs.map(s => s.id == id ? { ...s, title, category, audio_url, video_url, lyrics } : s);
+        try {
+            await db.collection('songs').doc(id).update({ title, category, audio_url, video_url, lyrics });
+            alert('Success! Song updated.');
+        } catch (err) {
+            alert('Update Failed: ' + err.message);
+            return;
         }
     }
 
-    updateNewFolderBadge();
     closeModal();
-    filterAndShowSongs();
 });
 
-window.addEventListener('DOMContentLoaded', async () => {
-    initSupabase();
-    await fetchSongs();
-    filterAndShowSongs();
+window.addEventListener('DOMContentLoaded', () => {
+    listenToSongs();
 });
