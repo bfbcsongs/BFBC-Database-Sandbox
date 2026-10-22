@@ -433,7 +433,6 @@ window.addEventListener('DOMContentLoaded', () => {
 let deferredPrompt;
 const installBanner = document.getElementById('pwa-install-banner');
 const installBtn = document.getElementById('pwa-install-btn');
-const exploreBtn = document.getElementById('pwa-explore-btn');
 
 // Suriin kung binuksan sa loob ng Messenger In-App Browser
 const isMessenger = () => {
@@ -442,26 +441,25 @@ const isMessenger = () => {
 };
 
 if (isMessenger()) {
-    // Kapag Messenger, palitan ang text sa banner para gabayan silang mag-Open in Chrome
     if (installBanner) {
         installBanner.innerHTML = `
-            <div class="bg-slate-800 border border-amber-500/30 rounded-2xl p-6 text-center max-w-sm w-full space-y-4 shadow-2xl">
-                <div class="w-16 h-16 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto border border-amber-500/30">
-                    <i class="fa-solid fa-compass text-3xl"></i>
+            <div class="bg-slate-800 border border-amber-500/40 rounded-2xl p-6 text-center max-w-sm w-full space-y-4 shadow-2xl relative">
+                <div class="w-14 h-14 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto border border-amber-500/30">
+                    <i class="fa-solid fa-download text-2xl"></i>
                 </div>
                 <div>
-                    <h3 class="text-lg font-bold text-white">Open in Chrome to Install</h3>
-                    <p class="text-xs text-slate-300 mt-1">Nasa loob ka ng Messenger browser. I-tap ang <b>3 dots (⋮)</b> sa kanang itaas at piliin ang <b>"Open in Chrome"</b> para mai-install ang app!</p>
+                    <h3 class="text-base font-bold text-white mb-3">2 steps to install</h3>
+                    <div class="text-xs text-slate-200 text-left bg-slate-900/80 p-3.5 rounded-xl border border-slate-700 space-y-2 font-medium">
+                        <p><b>Step 1:</b> Tap <b>(•••)</b> sa itaas bandang kanan.</p>
+                        <p><b>Step 2:</b> Tap <b>OPEN IN BROWSER</b>.</p>
+                    </div>
                 </div>
-                <button onclick="document.getElementById('pwa-install-banner').classList.add('hidden')" class="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl text-xs transition cursor-pointer">
-                    I-explore muna
-                </button>
             </div>
         `;
         installBanner.classList.remove('hidden');
     }
 } else {
-    // Kapag totoong browser (Chrome/Edge/Samsung Internet)
+    // Kapag nasa tunay na Browser (Chrome)
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
@@ -480,14 +478,6 @@ if (installBtn) {
         const { outcome } = await deferredPrompt.userChoice;
         console.log(`User response to install prompt: ${outcome}`);
         deferredPrompt = null;
-    });
-}
-
-if (exploreBtn) {
-    exploreBtn.addEventListener('click', () => {
-        if (installBanner) {
-            installBanner.classList.add('hidden');
-        }
     });
 }
 
