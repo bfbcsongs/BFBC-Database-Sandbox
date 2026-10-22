@@ -428,44 +428,61 @@ window.addEventListener('DOMContentLoaded', () => {
     listenToSongs();
 });
 // ==========================================
-// PWA INSTALLATION PROMPT LOGIC
+// PWA INSTALLATION & MESSENGER DETECTOR LOGIC
 // ==========================================
 let deferredPrompt;
 const installBanner = document.getElementById('pwa-install-banner');
 const installBtn = document.getElementById('pwa-install-btn');
 const exploreBtn = document.getElementById('pwa-explore-btn');
 
-// Abangan ang install event mula sa browser
-window.addEventListener('beforeinstallprompt', (e) => {
-    // Pigilan ang awtomatikong lumabas ang maliit na banner ng browser
-    e.preventDefault();
-    deferredPrompt = e;
+// Suriin kung binuksan sa loob ng Messenger In-App Browser
+const isMessenger = () => {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    return (ua.indexOf("FBAN") > -1) || (ua.indexOf("FBAV") > -1) || (ua.indexOf("Messenger") > -1);
+};
 
-    // Ipakita ang ating custom Install / Explore banner
+if (isMessenger()) {
+    // Kapag Messenger, palitan ang text sa banner para gabayan silang mag-Open in Chrome
     if (installBanner) {
+        installBanner.innerHTML = `
+            <div class="bg-slate-800 border border-amber-500/30 rounded-2xl p-6 text-center max-w-sm w-full space-y-4 shadow-2xl">
+                <div class="w-16 h-16 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto border border-amber-500/30">
+                    <i class="fa-solid fa-compass text-3xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-white">Open in Chrome to Install</h3>
+                    <p class="text-xs text-slate-300 mt-1">Nasa loob ka ng Messenger browser. I-tap ang <b>3 dots (⋮)</b> sa kanang itaas at piliin ang <b>"Open in Chrome"</b> para mai-install ang app!</p>
+                </div>
+                <button onclick="document.getElementById('pwa-install-banner').classList.add('hidden')" class="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl text-xs transition cursor-pointer">
+                    I-explore muna
+                </button>
+            </div>
+        `;
         installBanner.classList.remove('hidden');
     }
-});
+} else {
+    // Kapag totoong browser (Chrome/Edge/Samsung Internet)
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (installBanner) {
+            installBanner.classList.remove('hidden');
+        }
+    });
+}
 
-// Kapag pinitik ang "Install App Now"
+// Logic para sa Install Button kapag nasa Chrome
 if (installBtn) {
     installBtn.addEventListener('click', async () => {
         if (!deferredPrompt) return;
-        
-        // Itago ang banner
         installBanner.classList.add('hidden');
-        
-        // Ipakita ang native installation dialog ng phone
         deferredPrompt.prompt();
-        
         const { outcome } = await deferredPrompt.userChoice;
         console.log(`User response to install prompt: ${outcome}`);
-        
         deferredPrompt = null;
     });
 }
 
-// Kapag pinitik ang "Explore First"
 if (exploreBtn) {
     exploreBtn.addEventListener('click', () => {
         if (installBanner) {
@@ -474,11 +491,9 @@ if (exploreBtn) {
     });
 }
 
-// Tiyaking nakatago kapag nakakabit na bilang totoong app
 window.addEventListener('appinstalled', () => {
     if (installBanner) {
         installBanner.classList.add('hidden');
     }
     deferredPrompt = null;
-    console.log('PWA successfully installed!');
 });
