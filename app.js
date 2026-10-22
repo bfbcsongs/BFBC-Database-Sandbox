@@ -3,27 +3,8 @@ const SUPABASE_ANON_KEY = 'sb_publishable_nFGA38fcKrTioIZOkAHRrg_MkbZigvw';
 
 let db = null;
 
-// Initial Songs Dataset (Sandbox Backup)
-let songs = [
-    {
-        id: "1",
-        title: "Amazing Grace",
-        category: "Opening",
-        lyrics: "Amazing grace, how sweet the sound, that saved a wretch like me...\nI once was lost, but now am found;\nWas blind, but now I see.",
-        audio_url: "",
-        video_url: "https://www.youtube.com/watch?v=X6Mtpk4jeVA",
-        approved: true,
-        created_at: Date.now() - 300000
-    },
-    {
-        id: "2",
-        title: "Blessed Assurance",
-        category: "Joyful",
-        lyrics: "Blessed assurance, Jesus is mine!\nOh, what a foretaste of glory divine!\nHeir of salvation, purchase of God,\nBorn of His Spirit, washed in His blood.",
-        approved: true,
-        created_at: Date.now() - 200000
-    }
-];
+// Initial Fallback Songs Dataset
+let songs = [];
 
 let activeCategory = null;
 let inNewFolderView = false;
@@ -91,18 +72,18 @@ window.loadYTPlayer = function(songId, videoId) {
 
 // Helper for strict unapproved status check
 function isUnapproved(song) {
-    return song.approved === false || song.approved === 'false' || song.approved === 0 || song.approved === '0';
+    return song.approved === false || song.approved === 'false' || song.approved === 0 || song.approved === '0' || song.approved === null || song.approved === undefined;
 }
 
 // ==========================================
 // SUPABASE INITIALIZATION & FETCH
 // ==========================================
 function initSupabase() {
-    if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && typeof supabase !== 'undefined') {
+    if (typeof supabase !== 'undefined') {
         try {
             db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         } catch(e) {
-            console.log('Supabase not configured yet');
+            console.error('Supabase initialization failed:', e);
         }
     }
 }
@@ -110,12 +91,14 @@ function initSupabase() {
 async function fetchSongs() {
     if (!db) return;
     try {
-        const { data, error } = await db.from('songs_sandbox').select('*').order('created_at', { ascending: false });
-        if (!error && data && data.length > 0) {
+        const { data, error } = await db.from('songs').select('*').order('created_at', { ascending: false });
+        if (error) {
+            console.error('Fetch error from Supabase:', error.message);
+        } else if (data) {
             songs = data;
         }
     } catch (err) {
-        console.log('Using local sandbox dataset');
+        console.error('Failed to fetch songs:', err);
     }
     updateNewFolderBadge();
 }
@@ -163,7 +146,7 @@ function renderSongs(songsToRender, titleText) {
                     </div>
                     <div class="truncate">
                         <h3 class="font-bold text-sm text-white truncate">${song.title}</h3>
-                        <span class="text-[10px] font-semibold text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full mt-0.5 inline-block">${song.category}</span>
+                        <span class="text-[10px] font-semibold text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full mt-0.5 inline-block">${song.category || 'Unassigned'}</span>
                     </div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
@@ -185,7 +168,7 @@ function renderSongs(songsToRender, titleText) {
                     </button>
 
                     <button onclick="handleEditTap('${song.id}')" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white border border-slate-600 rounded-lg text-xs font-semibold transition-all cursor-pointer">
-                        <i class="fa-solid fa-pen"></i> Edit
+                        <i class="fa-solid fa-pen"></i> Edit (Tap 5x)
                     </button>
 
                     <button onclick="handleThumbsUpTap('${song.id}')" title="Tap 5 times to approve" class="flex items-center justify-center p-2 bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-slate-900 border border-amber-500/30 rounded-lg transition-all cursor-pointer">
@@ -221,7 +204,9 @@ window.toggleSongAccordion = function(id) {
     const icon = document.getElementById(`accordion-icon-${id}`);
     if (details) details.classList.toggle('hidden');
     if (icon) icon.classList.toggle('rotate-180');
-};window.toggleLyrics = function(id) {
+};
+
+window.toggleLyrics = function(id) {
     const lyricsElement = document.getElementById(`lyrics-container-${id}`);
     if (lyricsElement) {
         lyricsElement.classList.toggle('hidden');
@@ -277,7 +262,7 @@ window.handleThumbsUpTap = async function(id) {
 async function approveSong(id) {
     if (db) {
         try {
-            await db.from('songs_sandbox').update({ approved: true }).eq('id', id);
+            await db.from('songs').update({ approved: true }).eq('id', id);
             await fetchSongs();
         } catch (err) {
             console.error('Approval error:', err);
@@ -424,12 +409,12 @@ songForm.addEventListener('submit', async (e) => {
 
         if (db) {
             try {
-                const { error } = await db.from('songs_sandbox').insert([newSong]);
+                const { error } = await db.from('songs').insert([newSong]);
                 if (error) {
                     alert('Save Failed: ' + error.message);
                     return;
                 } else {
-                    alert('Success! Song saved to Sandbox.');
+                    alert('Success! Song saved.');
                     await fetchSongs();
                 }
             } catch (err) {
@@ -448,7 +433,7 @@ songForm.addEventListener('submit', async (e) => {
     } else {
         if (db) {
             try {
-                const { error } = await db.from('songs_sandbox').update({ title, category, audio_url, video_url, lyrics }).eq('id', id);
+                const { error } = await db.from('songs').update({ title, category, audio_url, video_url, lyrics }).eq('id', id);
                 if (error) {
                     alert('Update Failed: ' + error.message);
                     return;
