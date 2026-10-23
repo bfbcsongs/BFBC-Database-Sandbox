@@ -487,3 +487,162 @@ window.addEventListener('appinstalled', () => {
     }
     deferredPrompt = null;
 });
+// ==========================================
+// FLOATING AUDIO PLAYER & PLAYBACK LOGIC
+// ==========================================
+const audioPlayer = document.getElementById('main-audio-player');
+const playerBar = document.getElementById('audio-player-bar');
+const playerTitle = document.getElementById('player-song-title');
+const playerCategory = document.getElementById('player-song-category');
+const playPauseBtn = document.getElementById('play-pause-btn');
+const playIcon = document.getElementById('play-icon');
+const prevBtn = document.getElementById('prev-song-btn');
+const nextBtn = document.getElementById('next-song-btn');
+const repeatBtn = document.getElementById('repeat-mode-btn');
+const repeatIcon = document.getElementById('repeat-icon');
+const repeatLabel = document.getElementById('repeat-label');
+const shuffleBtn = document.getElementById('shuffle-btn');
+const shuffleLabel = document.getElementById('shuffle-label');
+const closePlayerBtn = document.getElementById('close-player-btn');
+
+let currentPlaylist = [];     // List ng mga kanta sa kasalukuyang category/view
+let currentIndex = -1;        // Posisyon ng kasalukuyang kanta
+let repeatMode = 'OFF';       // 'OFF', 'ALL', 'ONE'
+let isShuffle = false;
+
+// Function para patakbuhin ang kanta mula sa playlist
+window.playCategorySong = function(songsList, index) {
+    if (!songsList || songsList.length === 0 || index < 0 || index >= songsList.length) return;
+
+    currentPlaylist = songsList;
+    currentIndex = index;
+    const song = currentPlaylist[currentIndex];
+
+    if (!song.audioUrl) {
+        alert("Walang audio URL na naka-attach sa kantang ito.");
+        return;
+    }
+
+    audioPlayer.src = song.audioUrl;
+    playerTitle.textContent = song.title || 'Untitled Song';
+    playerCategory.textContent = song.category || 'BFBC Songs';
+
+    playerBar.classList.remove('hidden');
+    audioPlayer.play().then(() => {
+        updatePlayIcon(true);
+    }).catch(err => console.log("Audio play error:", err));
+};
+
+// Automatic Next / Repeat kapag natapos ang kanta
+if (audioPlayer) {
+    audioPlayer.addEventListener('ended', () => {
+        if (repeatMode === 'ONE') {
+            audioPlayer.currentTime = 0;
+            audioPlayer.play();
+        } else if (isShuffle && currentPlaylist.length > 1) {
+            let randomIndex;
+            do {
+                randomIndex = Math.floor(Math.random() * currentPlaylist.length);
+            } while (randomIndex === currentIndex);
+            window.playCategorySong(currentPlaylist, randomIndex);
+        } else if (currentIndex < currentPlaylist.length - 1) {
+            window.playCategorySong(currentPlaylist, currentIndex + 1);
+        } else if (repeatMode === 'ALL' && currentPlaylist.length > 0) {
+            window.playCategorySong(currentPlaylist, 0); // Loop back to start
+        } else {
+            updatePlayIcon(false);
+        }
+    });
+}
+
+// Play / Pause Toggle
+if (playPauseBtn) {
+    playPauseBtn.addEventListener('click', () => {
+        if (!audioPlayer.src) return;
+        if (audioPlayer.paused) {
+            audioPlayer.play();
+            updatePlayIcon(true);
+        } else {
+            audioPlayer.pause();
+            updatePlayIcon(false);
+        }
+    });
+}
+
+function updatePlayIcon(isPlaying) {
+    if (playIcon) {
+        playIcon.className = isPlaying ? 'fa-solid fa-pause text-xs' : 'fa-solid fa-play text-xs pl-0.5';
+    }
+}
+
+// Repeat Modes Toggle (OFF -> ALL -> 1)
+if (repeatBtn) {
+    repeatBtn.addEventListener('click', () => {
+        if (repeatMode === 'OFF') {
+            repeatMode = 'ALL';
+            repeatIcon.className = 'fa-solid fa-repeat text-indigo-400 text-sm';
+            repeatLabel.textContent = 'ALL';
+            repeatLabel.className = 'text-[9px] font-bold uppercase tracking-wider text-indigo-400';
+        } else if (repeatMode === 'ALL') {
+            repeatMode = 'ONE';
+            repeatIcon.className = 'fa-solid fa-arrows-rotate text-emerald-400 text-sm';
+            repeatLabel.textContent = '1';
+            repeatLabel.className = 'text-[9px] font-bold uppercase tracking-wider text-emerald-400';
+        } else {
+            repeatMode = 'OFF';
+            repeatIcon.className = 'fa-solid fa-repeat text-slate-400 text-sm';
+            repeatLabel.textContent = 'OFF';
+            repeatLabel.className = 'text-[9px] font-bold uppercase tracking-wider text-slate-400';
+        }
+    });
+}
+
+// Shuffle Toggle
+if (shuffleBtn) {
+    shuffleBtn.addEventListener('click', () => {
+        isShuffle = !isShuffle;
+        if (isShuffle) {
+            shuffleBtn.classList.add('text-amber-400');
+            shuffleLabel.textContent = 'ON';
+            shuffleLabel.className = 'text-[9px] font-bold uppercase tracking-wider text-amber-400';
+        } else {
+            shuffleBtn.classList.remove('text-amber-400');
+            shuffleLabel.textContent = 'OFF';
+            shuffleLabel.className = 'text-[9px] font-bold uppercase tracking-wider text-slate-400';
+        }
+    });
+}
+
+// Prev at Next Buttons
+if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+        if (currentPlaylist.length === 0) return;
+        if (isShuffle && currentPlaylist.length > 1) {
+            let randomIndex = Math.floor(Math.random() * currentPlaylist.length);
+            window.playCategorySong(currentPlaylist, randomIndex);
+        } else if (currentIndex < currentPlaylist.length - 1) {
+            window.playCategorySong(currentPlaylist, currentIndex + 1);
+        } else {
+            window.playCategorySong(currentPlaylist, 0);
+        }
+    });
+}
+
+if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+        if (currentPlaylist.length === 0) return;
+        if (currentIndex > 0) {
+            window.playCategorySong(currentPlaylist, currentIndex - 1);
+        } else {
+            window.playCategorySong(currentPlaylist, currentPlaylist.length - 1);
+        }
+    });
+}
+
+// Close Button
+if (closePlayerBtn) {
+    closePlayerBtn.addEventListener('click', () => {
+        audioPlayer.pause();
+        playerBar.classList.add('hidden');
+    });
+}
