@@ -17,7 +17,6 @@ const db = firebase.firestore();
 let songs = [];
 let activeCategory = null;
 let inNewFolderView = false;
-window.currentSortedSongs = [];
 
 // DOM Elements
 const searchInput = document.getElementById('search-input');
@@ -46,7 +45,7 @@ function extractYouTubeID(url) {
     return (match && match[2].length === 11) ? match[2] : null;
 }
 
-// Scoped Audio Player Loader for Accordion
+// Scoped Audio Player Loader
 window.loadYTPlayer = function(songId, videoId) {
     const allPlayers = document.querySelectorAll('[id^="yt-player-"]');
     allPlayers.forEach(p => {
@@ -122,7 +121,6 @@ function renderSongs(songsToRender, titleText) {
         sortedSongs.sort((a, b) => a.title.localeCompare(b.title));
     }
 
-    window.currentSortedSongs = sortedSongs;
     songCount.textContent = `${sortedSongs.length} song${sortedSongs.length === 1 ? '' : 's'} found`;
 
     if (sortedSongs.length === 0) {
@@ -130,7 +128,7 @@ function renderSongs(songsToRender, titleText) {
         return;
     }
 
-    songsList.innerHTML = sortedSongs.map((song, index) => {
+    songsList.innerHTML = sortedSongs.map(song => {
         const ytId = extractYouTubeID(song.video_url) || extractYouTubeID(song.audio_url);
         const thumbnailUrl = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null;
         const songIsUnapproved = isUnapproved(song);
@@ -158,8 +156,8 @@ function renderSongs(songsToRender, titleText) {
             <div id="accordion-details-${song.id}" class="hidden p-4 border-t border-slate-700/60 bg-slate-900/40 space-y-3">
                 <div class="flex items-center gap-2 flex-wrap">
                     ${ytId ? `
-                    <button onclick="playCategorySong(window.currentSortedSongs, ${index})" class="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600/25 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-600/30 rounded-lg text-xs font-semibold transition-all cursor-pointer">
-                        <i class="fa-solid fa-play"></i> Play in Player
+                    <button onclick="loadYTPlayer('${song.id}', '${ytId}')" class="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-600/30 rounded-lg text-xs font-semibold transition-all cursor-pointer">
+                        <i class="fa-solid fa-play"></i> Play Audio
                     </button>` : ''}
 
                     <button onclick="toggleLyrics('${song.id}')" class="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600/20 text-sky-400 hover:bg-sky-600 hover:text-white border border-sky-600/30 rounded-lg text-xs font-semibold transition-all cursor-pointer">
@@ -487,145 +485,3 @@ window.addEventListener('appinstalled', () => {
     }
     deferredPrompt = null;
 });
-
-// ==========================================
-// FLOATING AUDIO PLAYER & PLAYBACK LOGIC
-// ==========================================
-const playerBar = document.getElementById('audio-player-bar');
-const playerTitle = document.getElementById('player-song-title');
-const playerCategory = document.getElementById('player-song-category');
-const floatingYtPlayer = document.getElementById('floating-yt-player');
-const playPauseBtn = document.getElementById('play-pause-btn');
-const playIcon = document.getElementById('play-icon');
-const prevBtn = document.getElementById('prev-song-btn');
-const nextBtn = document.getElementById('next-song-btn');
-const repeatBtn = document.getElementById('repeat-mode-btn');
-const repeatIcon = document.getElementById('repeat-icon');
-const repeatLabel = document.getElementById('repeat-label');
-const shuffleBtn = document.getElementById('shuffle-btn');
-const shuffleLabel = document.getElementById('shuffle-label');
-const closePlayerBtn = document.getElementById('close-player-btn');
-
-let currentPlaylist = [];
-let currentIndex = -1;
-let repeatMode = 'OFF';
-let isShuffle = false;
-
-window.playCategorySong = function(songsList, index) {
-    if (!songsList || songsList.length === 0 || index < 0 || index >= songsList.length) return;
-
-    currentPlaylist = songsList;
-    currentIndex = index;
-    const song = currentPlaylist[currentIndex];
-
-    const ytId = extractYouTubeID(song.video_url) || extractYouTubeID(song.audio_url);
-    if (!ytId && !song.audio_url) {
-        alert("Walang audio o video URL ang kantang ito.");
-        return;
-    }
-
-    playerTitle.textContent = song.title || 'Untitled Song';
-    playerCategory.textContent = song.category || 'BFBC Songs';
-    playerBar.classList.remove('hidden');
-
-    if (floatingYtPlayer && ytId) {
-        floatingYtPlayer.classList.remove('hidden');
-        floatingYtPlayer.innerHTML = `
-            <iframe 
-                width="100%" 
-                height="70" 
-                src="https://www.youtube.com/embed/${ytId}?autoplay=1&playsinline=1" 
-                title="Audio Player" 
-                frameborder="0" 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                class="rounded-lg">
-            </iframe>
-        `;
-    }
-};
-
-// Next / Prev / Repeat Navigation Helpers
-function playNextSong() {
-    if (currentPlaylist.length === 0) return;
-
-    if (repeatMode === 'ONE') {
-        window.playCategorySong(currentPlaylist, currentIndex);
-    } else if (isShuffle && currentPlaylist.length > 1) {
-        let randomIndex;
-        do {
-            randomIndex = Math.floor(Math.random() * currentPlaylist.length);
-        } while (randomIndex === currentIndex);
-        window.playCategorySong(currentPlaylist, randomIndex);
-    } else if (currentIndex < currentPlaylist.length - 1) {
-        window.playCategorySong(currentPlaylist, currentIndex + 1);
-    } else if (repeatMode === 'ALL' && currentPlaylist.length > 0) {
-        window.playCategorySong(currentPlaylist, 0);
-    } else {
-        // Dulo na ng playlist at OFF ang repeat
-        if (floatingYtPlayer) floatingYtPlayer.innerHTML = '';
-        playerBar.classList.add('hidden');
-    }
-}
-
-if (nextBtn) {
-    nextBtn.addEventListener('click', () => {
-        playNextSong();
-    });
-}
-
-if (prevBtn) {
-    prevBtn.addEventListener('click', () => {
-        if (currentPlaylist.length === 0) return;
-        if (currentIndex > 0) {
-            window.playCategorySong(currentPlaylist, currentIndex - 1);
-        } else {
-            window.playCategorySong(currentPlaylist, currentPlaylist.length - 1);
-        }
-    });
-}
-
-// Repeat Modes Toggle (OFF -> ALL -> 1)
-if (repeatBtn) {
-    repeatBtn.addEventListener('click', () => {
-        if (repeatMode === 'OFF') {
-            repeatMode = 'ALL';
-            repeatIcon.className = 'fa-solid fa-repeat text-indigo-400 text-sm';
-            repeatLabel.textContent = 'ALL';
-            repeatLabel.className = 'text-[9px] font-bold uppercase tracking-wider text-indigo-400';
-        } else if (repeatMode === 'ALL') {
-            repeatMode = 'ONE';
-            repeatIcon.className = 'fa-solid fa-arrows-rotate text-emerald-400 text-sm';
-            repeatLabel.textContent = '1';
-            repeatLabel.className = 'text-[9px] font-bold uppercase tracking-wider text-emerald-400';
-        } else {
-            repeatMode = 'OFF';
-            repeatIcon.className = 'fa-solid fa-repeat text-slate-400 text-sm';
-            repeatLabel.textContent = 'OFF';
-            repeatLabel.className = 'text-[9px] font-bold uppercase tracking-wider text-slate-400';
-        }
-    });
-}
-
-// Shuffle Toggle
-if (shuffleBtn) {
-    shuffleBtn.addEventListener('click', () => {
-        isShuffle = !isShuffle;
-        if (isShuffle) {
-            shuffleBtn.classList.add('text-amber-400');
-            shuffleLabel.textContent = 'ON';
-            shuffleLabel.className = 'text-[9px] font-bold uppercase tracking-wider text-amber-400';
-        } else {
-            shuffleBtn.classList.remove('text-amber-400');
-            shuffleLabel.textContent = 'OFF';
-            shuffleLabel.className = 'text-[9px] font-bold uppercase tracking-wider text-slate-400';
-        }
-    });
-}
-
-// Close Button
-if (closePlayerBtn) {
-    closePlayerBtn.addEventListener('click', () => {
-        if (floatingYtPlayer) floatingYtPlayer.innerHTML = '';
-        playerBar.classList.add('hidden');
-    });
-}
