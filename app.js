@@ -17,6 +17,7 @@ const db = firebase.firestore();
 let songs = [];
 let activeCategory = null;
 let inNewFolderView = false;
+window.currentSortedSongs = [];
 
 // DOM Elements
 const searchInput = document.getElementById('search-input');
@@ -45,7 +46,7 @@ function extractYouTubeID(url) {
     return (match && match[2].length === 11) ? match[2] : null;
 }
 
-// Scoped Audio Player Loader
+// Scoped Audio Player Loader for Accordion
 window.loadYTPlayer = function(songId, videoId) {
     const allPlayers = document.querySelectorAll('[id^="yt-player-"]');
     allPlayers.forEach(p => {
@@ -121,6 +122,7 @@ function renderSongs(songsToRender, titleText) {
         sortedSongs.sort((a, b) => a.title.localeCompare(b.title));
     }
 
+    window.currentSortedSongs = sortedSongs;
     songCount.textContent = `${sortedSongs.length} song${sortedSongs.length === 1 ? '' : 's'} found`;
 
     if (sortedSongs.length === 0) {
@@ -128,7 +130,7 @@ function renderSongs(songsToRender, titleText) {
         return;
     }
 
-    songsList.innerHTML = sortedSongs.map(song => {
+    songsList.innerHTML = sortedSongs.map((song, index) => {
         const ytId = extractYouTubeID(song.video_url) || extractYouTubeID(song.audio_url);
         const thumbnailUrl = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null;
         const songIsUnapproved = isUnapproved(song);
@@ -156,8 +158,8 @@ function renderSongs(songsToRender, titleText) {
             <div id="accordion-details-${song.id}" class="hidden p-4 border-t border-slate-700/60 bg-slate-900/40 space-y-3">
                 <div class="flex items-center gap-2 flex-wrap">
                     ${ytId ? `
-                    <button onclick="loadYTPlayer('${song.id}', '${ytId}')" class="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-600/30 rounded-lg text-xs font-semibold transition-all cursor-pointer">
-                        <i class="fa-solid fa-play"></i> Play Audio
+                    <button onclick="playCategorySong(window.currentSortedSongs, ${index})" class="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600/25 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-600/30 rounded-lg text-xs font-semibold transition-all cursor-pointer">
+                        <i class="fa-solid fa-play"></i> Play in Player
                     </button>` : ''}
 
                     <button onclick="toggleLyrics('${song.id}')" class="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600/20 text-sky-400 hover:bg-sky-600 hover:text-white border border-sky-600/30 rounded-lg text-xs font-semibold transition-all cursor-pointer">
@@ -427,6 +429,7 @@ songForm.addEventListener('submit', async (e) => {
 window.addEventListener('DOMContentLoaded', () => {
     listenToSongs();
 });
+
 // ==========================================
 // PWA INSTALLATION & MESSENGER DETECTOR LOGIC
 // ==========================================
@@ -434,7 +437,6 @@ let deferredPrompt;
 const installBanner = document.getElementById('pwa-install-banner');
 const installBtn = document.getElementById('pwa-install-btn');
 
-// Suriin kung binuksan sa loob ng Messenger In-App Browser
 const isMessenger = () => {
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     return (ua.indexOf("FBAN") > -1) || (ua.indexOf("FBAV") > -1) || (ua.indexOf("Messenger") > -1);
@@ -459,7 +461,6 @@ if (isMessenger()) {
         installBanner.classList.remove('hidden');
     }
 } else {
-    // Kapag nasa tunay na Browser (Chrome)
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
@@ -469,7 +470,6 @@ if (isMessenger()) {
     });
 }
 
-// Logic para sa Install Button kapag nasa Chrome
 if (installBtn) {
     installBtn.addEventListener('click', async () => {
         if (!deferredPrompt) return;
@@ -487,13 +487,14 @@ window.addEventListener('appinstalled', () => {
     }
     deferredPrompt = null;
 });
+
 // ==========================================
 // FLOATING AUDIO PLAYER & PLAYBACK LOGIC
 // ==========================================
-const audioPlayer = document.getElementById('main-audio-player');
 const playerBar = document.getElementById('audio-player-bar');
 const playerTitle = document.getElementById('player-song-title');
 const playerCategory = document.getElementById('player-song-category');
+const floatingYtPlayer = document.getElementById('floating-yt-player');
 const playPauseBtn = document.getElementById('play-pause-btn');
 const playIcon = document.getElementById('play-icon');
 const prevBtn = document.getElementById('prev-song-btn');
@@ -505,12 +506,11 @@ const shuffleBtn = document.getElementById('shuffle-btn');
 const shuffleLabel = document.getElementById('shuffle-label');
 const closePlayerBtn = document.getElementById('close-player-btn');
 
-let currentPlaylist = [];     // List ng mga kanta sa kasalukuyang category/view
-let currentIndex = -1;        // Posisyon ng kasalukuyang kanta
-let repeatMode = 'OFF';       // 'OFF', 'ALL', 'ONE'
+let currentPlaylist = [];
+let currentIndex = -1;
+let repeatMode = 'OFF';
 let isShuffle = false;
 
-// Function para patakbuhin ang kanta mula sa playlist
 window.playCategorySong = function(songsList, index) {
     if (!songsList || songsList.length === 0 || index < 0 || index >= songsList.length) return;
 
@@ -518,61 +518,70 @@ window.playCategorySong = function(songsList, index) {
     currentIndex = index;
     const song = currentPlaylist[currentIndex];
 
-    if (!song.audioUrl) {
-        alert("Walang audio URL na naka-attach sa kantang ito.");
+    const ytId = extractYouTubeID(song.video_url) || extractYouTubeID(song.audio_url);
+    if (!ytId && !song.audio_url) {
+        alert("Walang audio o video URL ang kantang ito.");
         return;
     }
 
-    audioPlayer.src = song.audioUrl;
     playerTitle.textContent = song.title || 'Untitled Song';
     playerCategory.textContent = song.category || 'BFBC Songs';
-
     playerBar.classList.remove('hidden');
-    audioPlayer.play().then(() => {
-        updatePlayIcon(true);
-    }).catch(err => console.log("Audio play error:", err));
+
+    if (floatingYtPlayer && ytId) {
+        floatingYtPlayer.classList.remove('hidden');
+        floatingYtPlayer.innerHTML = `
+            <iframe 
+                width="100%" 
+                height="70" 
+                src="https://www.youtube.com/embed/${ytId}?autoplay=1&playsinline=1" 
+                title="Audio Player" 
+                frameborder="0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                class="rounded-lg">
+            </iframe>
+        `;
+    }
 };
 
-// Automatic Next / Repeat kapag natapos ang kanta
-if (audioPlayer) {
-    audioPlayer.addEventListener('ended', () => {
-        if (repeatMode === 'ONE') {
-            audioPlayer.currentTime = 0;
-            audioPlayer.play();
-        } else if (isShuffle && currentPlaylist.length > 1) {
-            let randomIndex;
-            do {
-                randomIndex = Math.floor(Math.random() * currentPlaylist.length);
-            } while (randomIndex === currentIndex);
-            window.playCategorySong(currentPlaylist, randomIndex);
-        } else if (currentIndex < currentPlaylist.length - 1) {
-            window.playCategorySong(currentPlaylist, currentIndex + 1);
-        } else if (repeatMode === 'ALL' && currentPlaylist.length > 0) {
-            window.playCategorySong(currentPlaylist, 0); // Loop back to start
-        } else {
-            updatePlayIcon(false);
-        }
-    });
-}
+// Next / Prev / Repeat Navigation Helpers
+function playNextSong() {
+    if (currentPlaylist.length === 0) return;
 
-// Play / Pause Toggle
-if (playPauseBtn) {
-    playPauseBtn.addEventListener('click', () => {
-        if (!audioPlayer.src) return;
-        if (audioPlayer.paused) {
-            audioPlayer.play();
-            updatePlayIcon(true);
-        } else {
-            audioPlayer.pause();
-            updatePlayIcon(false);
-        }
-    });
-}
-
-function updatePlayIcon(isPlaying) {
-    if (playIcon) {
-        playIcon.className = isPlaying ? 'fa-solid fa-pause text-xs' : 'fa-solid fa-play text-xs pl-0.5';
+    if (repeatMode === 'ONE') {
+        window.playCategorySong(currentPlaylist, currentIndex);
+    } else if (isShuffle && currentPlaylist.length > 1) {
+        let randomIndex;
+        do {
+            randomIndex = Math.floor(Math.random() * currentPlaylist.length);
+        } while (randomIndex === currentIndex);
+        window.playCategorySong(currentPlaylist, randomIndex);
+    } else if (currentIndex < currentPlaylist.length - 1) {
+        window.playCategorySong(currentPlaylist, currentIndex + 1);
+    } else if (repeatMode === 'ALL' && currentPlaylist.length > 0) {
+        window.playCategorySong(currentPlaylist, 0);
+    } else {
+        // Dulo na ng playlist at OFF ang repeat
+        if (floatingYtPlayer) floatingYtPlayer.innerHTML = '';
+        playerBar.classList.add('hidden');
     }
+}
+
+if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+        playNextSong();
+    });
+}
+
+if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+        if (currentPlaylist.length === 0) return;
+        if (currentIndex > 0) {
+            window.playCategorySong(currentPlaylist, currentIndex - 1);
+        } else {
+            window.playCategorySong(currentPlaylist, currentPlaylist.length - 1);
+        }
+    });
 }
 
 // Repeat Modes Toggle (OFF -> ALL -> 1)
@@ -613,36 +622,10 @@ if (shuffleBtn) {
     });
 }
 
-// Prev at Next Buttons
-if (nextBtn) {
-    nextBtn.addEventListener('click', () => {
-        if (currentPlaylist.length === 0) return;
-        if (isShuffle && currentPlaylist.length > 1) {
-            let randomIndex = Math.floor(Math.random() * currentPlaylist.length);
-            window.playCategorySong(currentPlaylist, randomIndex);
-        } else if (currentIndex < currentPlaylist.length - 1) {
-            window.playCategorySong(currentPlaylist, currentIndex + 1);
-        } else {
-            window.playCategorySong(currentPlaylist, 0);
-        }
-    });
-}
-
-if (prevBtn) {
-    prevBtn.addEventListener('click', () => {
-        if (currentPlaylist.length === 0) return;
-        if (currentIndex > 0) {
-            window.playCategorySong(currentPlaylist, currentIndex - 1);
-        } else {
-            window.playCategorySong(currentPlaylist, currentPlaylist.length - 1);
-        }
-    });
-}
-
 // Close Button
 if (closePlayerBtn) {
     closePlayerBtn.addEventListener('click', () => {
-        audioPlayer.pause();
+        if (floatingYtPlayer) floatingYtPlayer.innerHTML = '';
         playerBar.classList.add('hidden');
     });
 }
